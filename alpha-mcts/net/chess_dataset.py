@@ -4,9 +4,6 @@ from torch.utils.data import Dataset
 
 from features import Features
 
-# TODO
-# Maintain a buffer of moves to feed all at once into the net
-
 # For supervised training on games stored in a PGN file
 class ChessDataset(Dataset):
     def __init__(self, file, games, start=0, skip_draws=False):

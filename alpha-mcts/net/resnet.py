@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# TODO - Try WDL value head to stabilise training
+
 # I used same ordering of dimensions as the AlphaZero paper, need to swap them here to match channel-first convention of PyTorch
 class ResNet(nn.Module):
     def __init__(self, in_channels, res_channels, res_blocks, out_channels):
@@ -19,12 +21,13 @@ class ResNet(nn.Module):
         # Policy head
         self.conv_pol = nn.Conv2d(res_channels, out_channels, 1, 1)
 
-        # Value head
+        # Value head - WDL
         self.conv_val = nn.Conv2d(res_channels, 1, 1, 1)
         self.bn_val = nn.BatchNorm2d(1)
-        self.fc1 = nn.Linear(64, 256)
+        self.fc1 = nn.Linear(64, 128)
         self.dropout = nn.Dropout(0.4)
-        self.fc2 = nn.Linear(256, 1)
+        self.fc2 = nn.Linear(128, 3)
+        self.softmax = nn.Softmax(dim=1)
     
     def forward(self, x):
         # Shuffle dimensions into right order (-1 autofills for batch size)
@@ -40,18 +43,17 @@ class ResNet(nn.Module):
         policy = policy.permute(0, 2, 3 ,1)
 
         # Value head
-        value = F.leaky_relu(self.bn_val(self.conv_val(x)))
-        value = F.leaky_relu(self.fc1(torch.flatten(value, start_dim=1)))
+        value = F.relu(self.bn_val(self.conv_val(x)))
+        value = F.relu(self.fc1(torch.flatten(value, start_dim=1)))
         value = self.dropout(value)
-        # tanh squashes value output into (-1,1)
-        value = F.tanh(self.fc2(value)).squeeze(1)
+        # Softmax into WDL distribution
+        value = self.softmax(self.fc2(value)).squeeze(1)
 
         return policy, value
 
 class ResBlock(nn.Module):
     def __init__(self, channels):
         super().__init__()
-
         self.bn = nn.BatchNorm2d(channels)
 
         # 2 convolution layers

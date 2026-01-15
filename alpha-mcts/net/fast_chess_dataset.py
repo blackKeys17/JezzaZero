@@ -22,14 +22,8 @@ class FastChessDataset(Dataset):
 
             game_data = json.loads(game)
             board.reset()
-
+            
             winner = game_data["winner"]
-            if winner == chess.WHITE:
-                score = torch.tensor(0.8, dtype=torch.float32)
-            elif winner == chess.BLACK:
-                score = torch.tensor(-0.8, dtype=torch.float32)
-            else:
-                score = torch.tensor(0, dtype=torch.float32)
             
             position_tensors = [torch.zeros([8, 8, 12]) for i in range(3)]
             for move in game_data["moves"]:
@@ -57,6 +51,14 @@ class FastChessDataset(Dataset):
                 elif board.turn == chess.BLACK:
                     move_type = features.move_type(reflected_move)
                 encoded_next_move[x][y][move_type] = 1
+                
+                # Winner from current perspective (1-hot WDL format)
+                if winner == board.turn:
+                    score = torch.tensor([1, 0, 0], dtype=torch.float32)
+                elif winner != None:
+                    score = torch.tensor([0, 0, 1], dtype=torch.float32)
+                else:
+                    score = torch.tensor([0, 1, 0], dtype=torch.float32)
 
                 # Add training example as a triple: [board, move, score]
                 self.data.append([net_in, encoded_next_move, score])
@@ -74,4 +76,5 @@ class FastChessDataset(Dataset):
 if __name__ == "__main__":
     x = FastChessDataset("alpha-mcts/net/training_data/lichess_elite_2022-02.jsonl", 200, 0)
     print(x[1][0][:, :, 24])
+    print(x[1][2])
     print(len(x))
