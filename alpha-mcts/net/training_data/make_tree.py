@@ -1,25 +1,31 @@
 import chess
 from chess.polyglot import zobrist_hash
-import torch
+
+from copy import deepcopy
 import json
 from collections import defaultdict
 
 # DFS using the "tree", softer targets to use for training
 def write_data(file, position_data, board: chess.Board, move_stack):
     # Base case
-    if sum(position_data[zobrist_hash(board)][1]) <= 60:
+    if sum(position_data[zobrist_hash(board)][1]) <= 64:
         return
 
     # Process current position, into the form:
-    # [Encoded board (with move history), move distribution, WDL distribution]
+    # [Past board FENs, move distribution, WDL distribution]
     move_stack.append(board.fen())
     temp = [None, None, None]
     temp[0] = move_stack[-4:]
     
-    # TODO - Rescale to sum to 1
     zobrist = zobrist_hash(board)
-    temp[1] = position_data[zobrist][0]
-    temp[2] = position_data[zobrist][1]
+    total_moves = sum(position_data[zobrist][1])
+    
+    temp[1] = deepcopy(position_data[zobrist][0])
+    for key in temp[1].keys():
+        temp[1][key] /= total_moves    
+    temp[2] = deepcopy(position_data[zobrist][1])
+    for i in range(len(temp[2])):
+        temp[2][i] /= total_moves
 
     temp = json.dumps(temp)
     file.write(temp)
@@ -37,7 +43,7 @@ def write_data(file, position_data, board: chess.Board, move_stack):
     return
 
 input("Write game tree?")
-total_games = 1000000
+total_games = 10000000
 max_depth = 72
 f = open("alpha-mcts/net/training_data/lichess_elite_2022-02.jsonl", "r")
 position_data = defaultdict(lambda: [{}, [0, 0, 0]])
@@ -56,7 +62,7 @@ for game_num, game in enumerate(f, 1):
             break
         zobrist = zobrist_hash(board)
         # Move frequencies, WDL count
-        position_data[zobrist][0].update({move: position_data[zobrist][0].get(move, 1) + 1})
+        position_data[zobrist][0].update({move: position_data[zobrist][0].get(move, 0) + 1})
         
         if game_data["winner"] == chess.WHITE:
             position_data[zobrist][1][0] += 1

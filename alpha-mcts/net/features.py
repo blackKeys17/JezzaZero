@@ -65,6 +65,11 @@ class Features():
 
         return features
     
+    # TODO
+    # Build features using list of FEN strings
+    def encode_fen(self, fen):
+        pass
+
     # Reflect the board representation for black (helps speed up training)
     def reflect_board(self, features, move_history):
         out = torch.zeros_like(features)
@@ -131,6 +136,11 @@ class Features():
             return 62
         elif dx == 2 and dy == -1:
             return 63
+
+    # TODO
+    # Generate training label from move distribution
+    def soft_move_target(self, move_dist):
+        pass
 
     # Exponential formula with temperature to get distribution to pick moves from 
     def next_move_dist(self, visits, temp):
