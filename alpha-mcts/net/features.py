@@ -67,8 +67,18 @@ class Features():
     
     # TODO
     # Build features using list of FEN strings
-    def encode_fen(self, fen):
-        pass
+    def encode_fen(self, fens):
+        position_stack = []
+        board = chess.Board()
+        for fen in fens[::-1]:
+            if fen == None:
+                position_stack.append(torch.zeros(8, 8, 12))
+            else:
+                board.set_fen(fen)
+                position_stack.append(self.encode_pieces(board))
+
+        board.set_fen(fens[-1])
+        return self.encode_board(board, 4, position_stack)
 
     # Reflect the board representation for black (helps speed up training)
     def reflect_board(self, features, move_history):
@@ -140,7 +150,8 @@ class Features():
     # TODO
     # Generate training label from move distribution
     def soft_move_target(self, move_dist):
-        pass
+        moves, visits = list(zip(*move_dist.items()))
+        return self.policy_from_visits(moves, visits)
 
     # Exponential formula with temperature to get distribution to pick moves from 
     def next_move_dist(self, visits, temp):
