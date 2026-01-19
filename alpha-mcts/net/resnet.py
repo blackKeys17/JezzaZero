@@ -45,9 +45,10 @@ class ResNet(nn.Module):
         # Value head
         value = F.relu(self.bn_val(self.conv_val(x)))
         value = F.relu(self.fc1(torch.flatten(value, start_dim=1)))
-        value = self.dropout(value)
+        # value = self.dropout(value)
+
         # Softmax into WDL distribution
-        value = self.softmax(self.fc2(value)).squeeze(1)
+        value = self.fc2(value).squeeze(1)
 
         return policy, value
 
