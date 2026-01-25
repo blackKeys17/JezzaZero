@@ -9,12 +9,11 @@ from resnet import ResNet
 
 # Logging
 import time
-from matplotlib import pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
 
 batch_size = 256
-train_set = TreeDataset("alpha-mcts/net/training_data/lichess_elite_2022_soft_targets.jsonl", 10000)
+train_set = TreeDataset("alpha-mcts/net/training_data/lichess_elite_2022_soft_targets.jsonl", 950000)
 train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -61,9 +60,12 @@ for epoch in range(3):
         value_loss = value_criterion(value, score)
         loss = policy_loss + value_loss
         
-        cur_policy_loss += policy_loss.item()
-        cur_value_loss += value_loss.item()
-        cur_loss += loss.item()
+        policy_loss_item = policy_loss.item()
+        cur_policy_loss += policy_loss_item
+        value_loss_item = value_loss.item()
+        cur_value_loss += value_loss_item
+        loss_item = loss.item()
+        cur_loss += loss_item
 
         # Backpropagate and update weights
         loss.backward()
@@ -71,15 +73,19 @@ for epoch in range(3):
         optimiser.step()
         
         if i%50 == 0:
-            print(f"Epoch: {epoch + 1}, Batch number: {i}, Policy loss: {cur_policy_loss/50:.4f}, Value Loss: {cur_value_loss/50:.4f}")
+            print(f"Epoch: {epoch + 1}, Batch number: {i}, Policy loss: {cur_policy_loss/50:.5f}, Value Loss: {cur_value_loss/50:.5f}")
             print(f"GPU temperature: {torch.cuda.temperature()} degrees")
+            cur_policy_loss = 0
+            cur_value_loss = 0
+            cur_loss = 0
         
-        x_labels.append(epoch * len(train_loader) + i)
-        plot_losses.append(cur_loss)
+        writer.add_scalar("Loss/train", loss_item, epoch * len(train_loader) + i)
+        writer.add_scalar("Policy_Loss/train", policy_loss_item, epoch * len(train_loader) + i)
+        writer.add_scalar("Value_Loss/train", value_loss_item, epoch * len(train_loader) + i)
         
-        cur_loss = 0
-        cur_policy_loss = 0
-        cur_value_loss = 0
+        loss_item = 0
+        policy_loss_item = 0
+        value_loss_item = 0
         
     epochTime = time.perf_counter() - start
     print(f"\nEpoch {epoch + 1} time: {epochTime:.4f}s\n")
@@ -87,5 +93,7 @@ for epoch in range(3):
 input("Write new weights to file?")
 print("New weights have been saved")
 torch.save(net.state_dict(), "alpha-mcts/net/temp.pth")
-plt.plot(x_labels, plot_losses)
-plt.show()
+
+# Write to tensorboard
+writer.flush()
+writer.close()

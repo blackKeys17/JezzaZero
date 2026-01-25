@@ -73,23 +73,26 @@ def MCTS_train(root: MCTSNode, board: chess.Board, features: Features, net, simu
 
         # Using the policy head, adding Dirichlet noise to priors during training (controlled by alpha and epsilon)
         policy, value = net(torch.unsqueeze(features.encode_board(cur_pos, 4), 0))
-        policy, value = policy[0], value[0]
-        # print("\n".join([f"{str(i)}: {str(j.item())}" for i,j in list(zip(cur_node.children_moves, features.get_move_priors(features.mask_illegal(policy, cur_node.children_moves, board.turn), cur_node.children_moves, board.turn)))]))
-        # print(f"Node evaluation: {value.item()}")
+        policy, value = policy[0], torch.softmax(value[0], dim=0)
+        print(f"please {torch.sum(policy)}")
+        print(f"PLEASE {torch.sum(value)}")
+        print("\n".join([f"{str(i)}: {str(j.item())}" for i,j in list(zip(cur_node.children_moves, features.get_move_priors(features.mask_illegal(policy, cur_node.children_moves, board.turn), cur_node.children_moves, board.turn)))]))
+        print(f"Node evaluation: {value[0] - value[2]}")
         cur_node.children_masked_priors = features.add_dirichlet_noise(features.get_move_priors(features.mask_illegal(policy, cur_node.children_moves, board.turn), cur_node.children_moves, board.turn), alpha, epsilon)
 
         # Record the evaluation of the current node by the value head for training later, then backpropagate value
-        cur_node.predicted_value = value
-        cur_node.total_action_value += value
+        value_score = value[0] - value[2]
+        cur_node.predicted_value = value_score
+        cur_node.total_action_value += value_score
         cur_node.visits += 1
         while cur_node.parent != None:
             cur_node = cur_node.parent
-            cur_node.total_action_value += value
+            cur_node.total_action_value += value_score
             cur_node.visits += 1
              
             # Update stats of stored children
-            value = -value
-            cur_node.children_total_action_value[cur_node.last_expanded] += value
+            value_score = -value_score
+            cur_node.children_total_action_value[cur_node.last_expanded] += value_score
             cur_node.children_visits[cur_node.last_expanded] += 1
         
     # Select move to be played from visit count
