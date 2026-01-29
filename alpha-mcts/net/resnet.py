@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# TODO - Try WDL value head to stabilise training
-
 # I used same ordering of dimensions as the AlphaZero paper, need to swap them here to match channel-first convention of PyTorch
 class ResNet(nn.Module):
     def __init__(self, in_channels, res_channels, res_blocks, out_channels):

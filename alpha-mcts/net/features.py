@@ -1,5 +1,6 @@
 import chess
 import copy
+import numpy as np
 import torch
 import torch.nn.functional as F
 
@@ -20,12 +21,35 @@ class Features():
             features[x][y][self.piece_encodings[str(piece)]] = 1
         
         return features
+    
+    # Bitboard approach
+    def encode_pieces_fast(self, board: chess.Board):
+        features = np.zeros([8, 8, 12])
+        for i in range(12):
+            piece_mask = np.array([board.pieces_mask(i%6+1, 1-i//6)], dtype=np.uint64).view(np.uint8)
+            features[:, :, i] = np.unpackbits(piece_mask).reshape([8,8])
+        
+        return torch.tensor(features)
 
-    # TODO - HEAVILY optimise this using bitboards/anything else
     # Convert board object into a tensor of features, storing previous moves as well
     def encode_board(self, board: chess.Board, move_history, position_stack=None):
         temp = copy.deepcopy(board)
         features = torch.zeros([8, 8, move_history * 12 + 7])
+ 
+        # Current player colour
+        features[:, :, 12*move_history] = 1 if temp.turn == chess.WHITE else 0
+
+        # Castling rights
+        features[:, :, 12*move_history + 1] = temp.has_kingside_castling_rights(chess.WHITE)
+        features[:, :, 12*move_history + 2] = temp.has_queenside_castling_rights(chess.WHITE)
+        features[:, :, 12*move_history + 3] = temp.has_kingside_castling_rights(chess.BLACK)
+        features[:, :, 12*move_history + 4] = temp.has_queenside_castling_rights(chess.BLACK)
+
+        # Repeated moves
+        features[:, :, 12*move_history + 5] = temp.halfmove_clock
+
+        # Number of moves
+        features[:, :, 12*move_history + 6] = temp.fullmove_number
 
         if position_stack != None:
             for i in range(move_history):
@@ -47,6 +71,13 @@ class Features():
                     game_start = True
                 else:
                     temp.pop()
+
+        return features
+    
+    # Faster implementation by abusing bitboards
+    def encode_board_fast(self, board: chess.Board, move_history):
+        temp = copy.deepcopy(board)
+        features = np.zeros([8, 8, move_history * 12 + 7])
         
         # Current player colour
         features[:, :, 12*move_history] = 1 if temp.turn == chess.WHITE else 0
@@ -62,8 +93,22 @@ class Features():
 
         # Number of moves
         features[:, :, 12*move_history + 6] = temp.fullmove_number
+        game_start = False
 
-        return features
+        for move_num in range(move_history):
+            if not game_start:
+                for i in range(12):
+                    piece_mask = np.array([temp.pieces_mask(i%6+1, 1-i//6)], dtype=np.uint64).view(np.uint8)
+                    features[:, :, 12*move_num + i] = np.unpackbits(piece_mask).reshape([8,8])
+            else:
+                break
+            
+            if len(temp.move_stack) == 0:
+                game_start = True
+            else:
+                temp.pop()
+
+        return torch.tensor(features)
     
     # TODO
     # Build features using list of FEN strings
@@ -75,7 +120,7 @@ class Features():
                 position_stack.append(torch.zeros(8, 8, 12))
             else:
                 board.set_fen(fen)
-                position_stack.append(self.encode_pieces(board))
+                position_stack.append(self.encode_pieces_fast(board))
 
         board.set_fen(fens[-1])
         return self.encode_board(board, 4, position_stack)
@@ -147,7 +192,6 @@ class Features():
         elif dx == 2 and dy == -1:
             return 63
 
-    # TODO
     # Generate training label from move distribution
     def soft_move_target(self, move_dist):
         moves, visits = list(zip(*move_dist.items()))
@@ -218,6 +262,26 @@ class Features():
         return (1 - epsilon) * priors + epsilon * dirichlet.sample()
 
 if __name__ == "__main__":
+    import time
     x = Features()
     priors = torch.tensor([0.2, 0.3, 0.5])
     print(x.add_dirichlet_noise(priors, 0.3, 0.25))
+
+    board = chess.Board()
+    board.push_uci("e2e4")
+    board.push_uci("e7e5")
+    board.push_uci("a2a4")
+    board.push_uci("g8f6")
+
+    # a = time.perf_counter()
+    # for i in range(10000):
+    #     x.encode_board_fast(board, 4)
+    # print(time.perf_counter() - a)
+
+    # a = time.perf_counter()
+    # for i in range(10000):
+    #     x.encode_board(board, 4)
+    # print(time.perf_counter() - a)
+
+    print(x.encode_pieces(board)[:, :, 0])
+    print(x.encode_pieces_fast(board)[:, :, 0])

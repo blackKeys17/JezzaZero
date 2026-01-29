@@ -26,8 +26,9 @@ class TreeDataset(Dataset):
         fen, move_dist, wdl_dist = self.data[index]
         if fen[-1].split()[1] == "w":
             return [self.features.encode_fen(fen), self.features.soft_move_target(move_dist), torch.tensor(wdl_dist)]
+        # TODO - reflect move label too
         else:
-            return [self.features.encode_fen(fen), self.features.soft_move_target(move_dist), torch.tensor(wdl_dist[::-1])]
+            return [self.features.reflect_board(self.features.encode_fen(fen), 4), self.features.soft_move_target(move_dist), torch.tensor(wdl_dist[::-1])]
     
 if __name__ == "__main__":
     x = TreeDataset("alpha-mcts/net/training_data/lichess_elite_2022_soft_targets.jsonl")

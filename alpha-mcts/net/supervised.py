@@ -6,17 +6,21 @@ import torch.optim as optim
 
 from tree_dataset import TreeDataset
 from resnet import ResNet
+from test import test
 
 # Logging
 import time
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
 
-batch_size = 256
-train_set = TreeDataset("alpha-mcts/net/training_data/lichess_elite_2022_soft_targets.jsonl", 950000)
-train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# TODO - Add validation loss and validation accuracy to training loop
 
+batch_size = 512
+train_set = TreeDataset("alpha-mcts/net/training_data/lichess_elite_2023_11_soft_targets.jsonl", 10000000)
+train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
+test_set = TreeDataset("alpha-mcts/net/training_data/lichess_elite_2022_soft_targets.jsonl", 102400)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 net = ResNet(55, 128, 8, 64)
 # net.load_state_dict(torch.load("alpha-mcts/net/weights.pth"))
 net.train()
@@ -87,6 +91,19 @@ for epoch in range(3):
         policy_loss_item = 0
         value_loss_item = 0
         
+    # TODO - Log training set and test set accuracy
+    top, top_k = test(net, train_set, 3)
+    print(f"Top move accuracy on training set: {top}")
+    print(f"Top 3 move average on training set: {top_k}")
+    writer.add_scalar("Training_accuracy/top_move_accuracy", top, epoch)
+    writer.add_scalar("Training_accuracy/top_k_move_accuracy", top_k, epoch)
+
+    test_top, test_top_k = test(net, test_set, 3)
+    print(f"Top move accuracy on test set: {test_top}")
+    print(f"Top 3 move average on test set: {test_top_k}")
+    writer.add_scalar("Test_accuracy/top_move_accuracy", test_top, epoch)
+    writer.add_scalar("Test_accuracy/top_k_move_accuracy", test_top_k, epoch)
+
     epochTime = time.perf_counter() - start
     print(f"\nEpoch {epoch + 1} time: {epochTime:.4f}s\n")
 

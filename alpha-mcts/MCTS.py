@@ -4,6 +4,7 @@ import torch
 
 from net.features import Features
 
+# TODO - rewrite to use new bitboard encoding (which mirrors vertically)
 class MCTSNode():
     def __init__(self, parent, move, player_turn, c_puct):
         self.parent = parent
@@ -43,9 +44,6 @@ class MCTSNode():
     # Returns index of puct-maximising node for selection stage of MCTS
     def select(self):
         return torch.argmax(self.puct())
-
-# TODO
-# Keep a buffer of the last few positions to feed into the network instead of single positions
 
 # MCTS from a given root node and position, for training (subtrees are reused so tree might already be partially constructed)
 # Returns the index of the next move to be played
