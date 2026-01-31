@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 from copy import deepcopy
 from features import Features
 
+# TODO - fix top-k accuracy
 # Test against top k moves
 def test(net, dataset, k):
     f = Features()

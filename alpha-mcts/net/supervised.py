@@ -13,11 +13,12 @@ import time
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
 
-# TODO - Add validation loss and validation accuracy to training loop
+# TODO - Add validation loss and validation accuracy to training loop, make it more frequent
 
 batch_size = 512
 train_set = TreeDataset("alpha-mcts/net/training_data/lichess_elite_2023_11_soft_targets.jsonl", 10000000)
 train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
+train_test = TreeDataset("alpha-mcts/net/training_data/lichess_elite_2023_11_soft_targets.jsonl", 102400)
 test_set = TreeDataset("alpha-mcts/net/training_data/lichess_elite_2022_soft_targets.jsonl", 102400)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -34,8 +35,10 @@ optimiser = optim.SGD(net.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0
 cur_loss = 0
 cur_policy_loss = 0
 cur_value_loss = 0
-x_labels = []
-plot_losses = []
+
+# Train and test accuracy
+test_freq = 1000
+total_processed = 0
 
 torch.backends.cudnn.benchmark = True
 
@@ -90,19 +93,22 @@ for epoch in range(3):
         loss_item = 0
         policy_loss_item = 0
         value_loss_item = 0
-        
-    # TODO - Log training set and test set accuracy
-    top, top_k = test(net, train_set, 3)
-    print(f"Top move accuracy on training set: {top}")
-    print(f"Top 3 move average on training set: {top_k}")
-    writer.add_scalar("Training_accuracy/top_move_accuracy", top, epoch)
-    writer.add_scalar("Training_accuracy/top_k_move_accuracy", top_k, epoch)
 
-    test_top, test_top_k = test(net, test_set, 3)
-    print(f"Top move accuracy on test set: {test_top}")
-    print(f"Top 3 move average on test set: {test_top_k}")
-    writer.add_scalar("Test_accuracy/top_move_accuracy", test_top, epoch)
-    writer.add_scalar("Test_accuracy/top_k_move_accuracy", test_top_k, epoch)
+        total_processed += 1
+        if total_processed % test_freq == 0:
+            print("\nStarted testing:")
+            top, top_k = test(net, train_test, 3)
+            print(f"Top move accuracy on training set: {top}")
+            print(f"Top 3 move average on training set: {top_k}")
+            writer.add_scalar("Training_accuracy/top_move_accuracy", top, total_processed)
+            writer.add_scalar("Training_accuracy/top_k_move_accuracy", top_k, total_processed)
+
+            test_top, test_top_k = test(net, test_set, 3)
+            print(f"Top move accuracy on test set: {test_top}")
+            print(f"Top 3 move average on test set: {test_top_k}")
+            writer.add_scalar("Test_accuracy/top_move_accuracy", test_top, total_processed)
+            writer.add_scalar("Test_accuracy/top_k_move_accuracy", test_top_k, total_processed)
+            print()
 
     epochTime = time.perf_counter() - start
     print(f"\nEpoch {epoch + 1} time: {epochTime:.4f}s\n")

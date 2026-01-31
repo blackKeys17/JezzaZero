@@ -15,7 +15,7 @@ features = Features()
 player_turn = True
 while not board.is_game_over():
     if player_turn:
-        move = MCTS_train(root, board, features, net, 2, 0.5, 1.25, 0.3, 0)
+        move = MCTS_train(root, board, features, net, 600, 0.5, 1.25, 0.3, 0)
         print(f"Nodes evaluated: {root.visits}")
         print(f"Move: {root.children_moves[move]}")
         board.push_san(root.children_moves[move])

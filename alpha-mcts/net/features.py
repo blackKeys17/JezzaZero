@@ -110,7 +110,6 @@ class Features():
 
         return torch.tensor(features)
     
-    # TODO
     # Build features using list of FEN strings
     def encode_fen(self, fens):
         position_stack = []
